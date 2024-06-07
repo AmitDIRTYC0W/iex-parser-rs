@@ -25,7 +25,7 @@ fn iex_tp_1_message(input: &[u8]) -> IResult<&[u8], &[u8]> {
 }
 
 #[derive(Clone, Debug)]
-struct IexTp1Segment<'a> {
+pub struct IexTp1Segment<'a> {
     pub message_protocol_id: u16,
     pub channel_id: u32,
     pub session_id: u32,
@@ -64,7 +64,7 @@ fn iex_tp_1_segment<'a>(input: &'a [u8]) -> IResult<&[u8], IexTp1Segment> {
 }
 
 #[derive(Debug)]
-enum IexTpSegment<'a> {
+pub enum IexTpSegment<'a> {
     V1(IexTp1Segment<'a>),
 }
 
