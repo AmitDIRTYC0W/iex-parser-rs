@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.38"
+float_eq = "1.0.1"
 nom = "7.1.3"
