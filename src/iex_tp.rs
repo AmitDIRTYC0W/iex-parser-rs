@@ -87,9 +87,7 @@ mod tests {
             0x20, 0x20, 0xE4, 0x25, 0x00, 0x00, 0x24, 0x1D, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
         let result = iex_tp_segment(&input).unwrap();
-        println!("{:?}", result);
 
-        // TODO replace the first _ with [] or b""
         assert_matches!(
             result,
             (
