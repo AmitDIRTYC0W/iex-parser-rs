@@ -25,7 +25,7 @@ pub struct IexTp1Segment<'a> {
     pub first_message_sequence_no: i64,
 }
 
-fn iex_tp_1_segment<'a>(input: &'a [u8]) -> IResult<&[u8], IexTp1Segment> {
+fn iex_tp_1_segment(input: &[u8]) -> IResult<&[u8], IexTp1Segment> {
     // Parse the version (0x01) and the reserved byte
     let (input, _) = tag([1u8, 0u8]).parse(input)?;
     let (input, message_protocol_id) = le_u16.parse(input)?;
