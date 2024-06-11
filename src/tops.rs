@@ -19,11 +19,14 @@ pub enum MarketSession {
 }
 
 #[derive(Debug)]
-pub struct QuoteUpdate<'a> {
+pub struct QuoteUpdate<S>
+where
+    S: for<'a> From<&'a str>,
+{
     pub available: bool,
     pub market_session: MarketSession,
     pub timestamp: DateTime<Utc>,
-    pub symbol: &'a str,
+    pub symbol: S,
     pub bid_size: u32,
     pub bid_price: f64,
     pub ask_size: u32,
@@ -38,7 +41,10 @@ fn price(input: &[u8]) -> IResult<&[u8], f64> {
     Ok((input, (int_price as f64) * 1e-4))
 }
 
-fn quote_update(input: &[u8]) -> IResult<&[u8], QuoteUpdate> {
+fn quote_update<S>(input: &[u8]) -> IResult<&[u8], QuoteUpdate<S>>
+where
+    S: for<'a> From<&'a str>,
+{
     let (input, _) = tag([0x51]).parse(input)?;
     // let (input, _) = bits::<_, _, Error<(&[u8], usize)>, _, _>(nom::bits::complete::take(4usize))
     //     .parse(input)?;
@@ -65,7 +71,7 @@ fn quote_update(input: &[u8]) -> IResult<&[u8], QuoteUpdate> {
                 MarketSession::Regular
             },
             timestamp,
-            symbol,
+            symbol: symbol.into(),
             bid_size,
             bid_price,
             ask_size,
@@ -75,11 +81,17 @@ fn quote_update(input: &[u8]) -> IResult<&[u8], QuoteUpdate> {
 }
 
 #[derive(Debug)]
-pub enum Tops1_6Message<'a> {
-    QuoteUpdate(QuoteUpdate<'a>),
+pub enum Tops1_6Message<S>
+where
+    S: for<'a> From<&'a str>,
+{
+    QuoteUpdate(QuoteUpdate<S>),
 }
 
-pub fn tops_1_6_message(input: &[u8]) -> IResult<&[u8], Tops1_6Message> {
+pub fn tops_1_6_message<S>(input: &[u8]) -> IResult<&[u8], Tops1_6Message<S>>
+where
+    S: for<'a> From<&'a str>,
+{
     alt((map(quote_update, Tops1_6Message::QuoteUpdate),)).parse(input)
 }
 
@@ -98,7 +110,7 @@ mod tests {
             0x54, 0x20, 0x20, 0x20, 0xE4, 0x25, 0x00, 0x00, 0x24, 0x1D, 0x0F, 0x00, 0x00, 0x00,
             0x00, 0x00, 0xEC, 0x1D, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE8, 0x03, 0x00, 0x00,
         ];
-        let result = tops_1_6_message(&input).unwrap();
+        let result = tops_1_6_message::<String>(&input).unwrap();
 
         assert_matches!(
             result,
@@ -108,7 +120,7 @@ mod tests {
                     available: true,
                     market_session: MarketSession::Regular,
                     timestamp: _,
-                    symbol: "ZIEXT",
+                    symbol: _,
                     bid_size: 9700,
                     bid_price: _,
                     ask_size: 1000,
@@ -118,6 +130,8 @@ mod tests {
         );
 
         let Tops1_6Message::QuoteUpdate(inner_result) = result.1;
+
+        assert_eq!(inner_result.symbol, "ZIEXT");
 
         assert_eq!(
             inner_result.timestamp,
