@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use nom::{
     bits,
     branch::alt,
-    bytes::complete::tag,
+    bytes::complete::{tag, take},
     combinator::map,
     error::Error,
     number::complete::{le_i64, le_u32},
@@ -40,6 +40,31 @@ fn price(input: &[u8]) -> IResult<&[u8], f64> {
     let (input, int_price) = le_i64.parse(input)?;
     Ok((input, (int_price as f64) * 1e-4))
 }
+
+// Handle known yet unimplemented message types
+macro_rules! dummy_message_parser {
+    ($tag:expr, $len:expr, $msg_type:ident) => {
+        fn $msg_type<S>(input: &[u8]) -> IResult<&[u8], ()>
+        where
+            S: for<'a> From<&'a str>,
+        {
+            let (input, _) = tag($tag).parse(input)?;
+            let (input, _) = take($len).parse(input)?;
+            Ok((input, ()))
+        }
+    };
+}
+
+dummy_message_parser!([0x53], 10usize, system_event);
+dummy_message_parser!([0x44], 30usize, security_directory);
+dummy_message_parser!([0x48], 21usize, trading_status);
+dummy_message_parser!([0x49], 17usize, retail_liquidity_indicator);
+dummy_message_parser!([0x4f], 17usize, operational_halt_status);
+dummy_message_parser!([0x50], 18usize, short_sale_price_test_status);
+dummy_message_parser!([0x54], 37usize, trade_report);
+dummy_message_parser!([0x58], 25usize, official_price);
+dummy_message_parser!([0x42], 37usize, trade_break);
+dummy_message_parser!([0x41], 79usize, auction_information);
 
 fn quote_update<S>(input: &[u8]) -> IResult<&[u8], QuoteUpdate<S>>
 where
@@ -85,14 +110,47 @@ pub enum Tops1_6Message<S>
 where
     S: for<'a> From<&'a str>,
 {
+    SystemEvent,
+    SecurityDirectory,
+    TradingStatus,
+    RetailLiquidityIndicator,
+    OperationalHaltStatus,
+    ShortSalePriceTestStatus,
     QuoteUpdate(QuoteUpdate<S>),
+    TradeReport,
+    OfficialPrice,
+    TradeBreak,
+    AuctionInformation,
 }
 
 pub fn tops_1_6_message<S>(input: &[u8]) -> IResult<&[u8], Tops1_6Message<S>>
 where
     S: for<'a> From<&'a str>,
 {
-    alt((map(quote_update, Tops1_6Message::QuoteUpdate),)).parse(input)
+    alt((
+        map(system_event::<S>, |_| Tops1_6Message::SystemEvent),
+        map(security_directory::<S>, |_| {
+            Tops1_6Message::SecurityDirectory
+        }),
+        map(trading_status::<S>, |_| Tops1_6Message::TradingStatus),
+        map(retail_liquidity_indicator::<S>, |_| {
+            Tops1_6Message::RetailLiquidityIndicator
+        }),
+        map(operational_halt_status::<S>, |_| {
+            Tops1_6Message::OperationalHaltStatus
+        }),
+        map(short_sale_price_test_status::<S>, |_| {
+            Tops1_6Message::ShortSalePriceTestStatus
+        }),
+        map(quote_update, Tops1_6Message::QuoteUpdate),
+        map(trade_report::<S>, |_| Tops1_6Message::TradeReport),
+        map(official_price::<S>, |_| Tops1_6Message::OfficialPrice),
+        map(trade_break::<S>, |_| Tops1_6Message::TradeBreak),
+        map(auction_information::<S>, |_| {
+            Tops1_6Message::AuctionInformation
+        }),
+    ))
+    .parse(input)
 }
 
 #[cfg(test)]
@@ -129,16 +187,18 @@ mod tests {
             )
         );
 
-        let Tops1_6Message::QuoteUpdate(inner_result) = result.1;
+        if let Tops1_6Message::QuoteUpdate(inner_result) = result.1 {
+            assert_eq!(inner_result.symbol, "ZIEXT");
 
-        assert_eq!(inner_result.symbol, "ZIEXT");
+            assert_eq!(
+                inner_result.timestamp,
+                DateTime::from_timestamp_nanos(1471980632572715948)
+            );
 
-        assert_eq!(
-            inner_result.timestamp,
-            DateTime::from_timestamp_nanos(1471980632572715948)
-        );
-
-        assert_float_eq!(inner_result.bid_price, 99.05, ulps <= 5);
-        assert_float_eq!(inner_result.ask_price, 99.07, ulps <= 5);
+            assert_float_eq!(inner_result.bid_price, 99.05, ulps <= 5);
+            assert_float_eq!(inner_result.ask_price, 99.07, ulps <= 5);
+        } else {
+            unreachable!()
+        }
     }
 }
