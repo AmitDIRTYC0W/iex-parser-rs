@@ -20,14 +20,14 @@ pub enum MarketSession {
 
 #[derive(Debug)]
 pub struct QuoteUpdate<'a> {
-    available: bool,
-    market_session: MarketSession,
-    timestamp: DateTime<Utc>,
-    symbol: &'a str,
-    bid_size: u32,
-    bid_price: f64,
-    ask_size: u32,
-    ask_price: f64,
+    pub available: bool,
+    pub market_session: MarketSession,
+    pub timestamp: DateTime<Utc>,
+    pub symbol: &'a str,
+    pub bid_size: u32,
+    pub bid_price: f64,
+    pub ask_size: u32,
+    pub ask_price: f64,
 }
 
 // TODO document properly
@@ -82,6 +82,7 @@ pub enum Tops1_6Message<'a> {
 pub fn tops_1_6_message(input: &[u8]) -> IResult<&[u8], Tops1_6Message> {
     alt((map(quote_update, Tops1_6Message::QuoteUpdate),)).parse(input)
 }
+
 #[cfg(test)]
 mod tests {
     use std::assert_matches::assert_matches;
