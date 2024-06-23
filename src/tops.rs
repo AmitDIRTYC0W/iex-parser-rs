@@ -44,10 +44,7 @@ fn price(input: &[u8]) -> IResult<&[u8], f64> {
 // Handle known yet unimplemented message types
 macro_rules! dummy_message_parser {
     ($tag:expr, $len:expr, $msg_type:ident) => {
-        fn $msg_type<S>(input: &[u8]) -> IResult<&[u8], ()>
-        where
-            S: for<'a> From<&'a str>,
-        {
+        fn $msg_type(input: &[u8]) -> IResult<&[u8], ()> {
             let (input, _) = tag($tag).parse(input)?;
             let (input, _) = take($len).parse(input)?;
             Ok((input, ()))
@@ -127,27 +124,23 @@ where
     S: for<'a> From<&'a str>,
 {
     alt((
-        map(system_event::<S>, |_| Tops1_6Message::SystemEvent),
-        map(security_directory::<S>, |_| {
-            Tops1_6Message::SecurityDirectory
-        }),
-        map(trading_status::<S>, |_| Tops1_6Message::TradingStatus),
-        map(retail_liquidity_indicator::<S>, |_| {
+        map(system_event, |_| Tops1_6Message::SystemEvent),
+        map(security_directory, |_| Tops1_6Message::SecurityDirectory),
+        map(trading_status, |_| Tops1_6Message::TradingStatus),
+        map(retail_liquidity_indicator, |_| {
             Tops1_6Message::RetailLiquidityIndicator
         }),
-        map(operational_halt_status::<S>, |_| {
+        map(operational_halt_status, |_| {
             Tops1_6Message::OperationalHaltStatus
         }),
-        map(short_sale_price_test_status::<S>, |_| {
+        map(short_sale_price_test_status, |_| {
             Tops1_6Message::ShortSalePriceTestStatus
         }),
-        map(quote_update, Tops1_6Message::QuoteUpdate),
-        map(trade_report::<S>, |_| Tops1_6Message::TradeReport),
-        map(official_price::<S>, |_| Tops1_6Message::OfficialPrice),
-        map(trade_break::<S>, |_| Tops1_6Message::TradeBreak),
-        map(auction_information::<S>, |_| {
-            Tops1_6Message::AuctionInformation
-        }),
+        map(quote_update::<S>, Tops1_6Message::QuoteUpdate),
+        map(trade_report, |_| Tops1_6Message::TradeReport),
+        map(official_price, |_| Tops1_6Message::OfficialPrice),
+        map(trade_break, |_| Tops1_6Message::TradeBreak),
+        map(auction_information, |_| Tops1_6Message::AuctionInformation),
     ))
     .parse(input)
 }
