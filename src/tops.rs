@@ -73,14 +73,14 @@ where
     let (input, _) = tag([0x51]).parse(input)?;
     // let (input, _) = bits::<_, _, Error<(&[u8], usize)>, _, _>(nom::bits::complete::take(4usize))
     //     .parse(input)?;
-    let (input, (_, availability, market_session, _)): (&[u8], (u8, bool, bool, u8)) =
+    let (input, (availability, market_session, _)): (&[u8], (bool, bool, u8)) =
         bits::<_, _, Error<(&[u8], usize)>, _, _>(tuple((
-            nom::bits::complete::tag(0u8, 1usize),
             nom::bits::complete::bool,
             nom::bits::complete::bool,
-            nom::bits::complete::tag(0u8, 5usize),
+            nom::bits::complete::tag(0u8, 6usize),
         )))
         .parse(input)?;
+    println!("fuck");
     let (input, timestamp) = utils::timestamp.parse(input)?;
     let (input, symbol) = utils::iex_string(8).parse(input)?;
     let (input, (bid_size, bid_price)) = (le_u32, price).parse(input)?;
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn quote_update_example() {
-        let input: [u8; 0x2A] = [
+        let input: [u8; 42] = [
             0x51, 0x00, 0xAC, 0x63, 0xC0, 0x20, 0x96, 0x86, 0x6D, 0x14, 0x5A, 0x49, 0x45, 0x58,
             0x54, 0x20, 0x20, 0x20, 0xE4, 0x25, 0x00, 0x00, 0x24, 0x1D, 0x0F, 0x00, 0x00, 0x00,
             0x00, 0x00, 0xEC, 0x1D, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE8, 0x03, 0x00, 0x00,
@@ -200,5 +200,15 @@ mod tests {
         } else {
             unreachable!()
         }
+    }
+
+    #[test]
+    fn quote_with_set_flags() {
+        let input: [u8; 42] = [
+            81, 192, 130, 69, 230, 110, 149, 21, 218, 23, 65, 72, 73, 32, 32, 32, 32, 32, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+
+        let _ = tops_1_6_message::<String>(&input).unwrap();
     }
 }

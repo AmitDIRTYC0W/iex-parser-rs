@@ -15,7 +15,7 @@ pub fn timestamp(input: &[u8]) -> IResult<&[u8], DateTime<Utc>> {
 ///
 /// # Arguments
 ///
-/// * `length` - The fixed length of the IEX String
+/// - `length` - The fixed length of the IEX String
 ///
 /// # Example
 ///
