@@ -80,7 +80,6 @@ where
             nom::bits::complete::tag(0u8, 6usize),
         )))
         .parse(input)?;
-    println!("fuck");
     let (input, timestamp) = utils::timestamp.parse(input)?;
     let (input, symbol) = utils::iex_string(8).parse(input)?;
     let (input, (bid_size, bid_price)) = (le_u32, price).parse(input)?;
