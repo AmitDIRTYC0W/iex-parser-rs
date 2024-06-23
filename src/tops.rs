@@ -55,7 +55,7 @@ macro_rules! dummy_message_parser {
     };
 }
 
-dummy_message_parser!([0x53], 10usize, system_event);
+dummy_message_parser!([0x53], 9usize, system_event);
 dummy_message_parser!([0x44], 30usize, security_directory);
 dummy_message_parser!([0x48], 21usize, trading_status);
 dummy_message_parser!([0x49], 17usize, retail_liquidity_indicator);
@@ -207,6 +207,13 @@ mod tests {
             81, 192, 130, 69, 230, 110, 149, 21, 218, 23, 65, 72, 73, 32, 32, 32, 32, 32, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
+
+        let _ = tops_1_6_message::<String>(&input).unwrap();
+    }
+
+    #[test]
+    fn system_event_message() {
+        let input: [u8; 10] = [83, 79, 201, 234, 221, 110, 149, 21, 218, 23];
 
         let _ = tops_1_6_message::<String>(&input).unwrap();
     }
