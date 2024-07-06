@@ -11,6 +11,14 @@ pub fn timestamp(input: &[u8]) -> IResult<&[u8], DateTime<Utc>> {
     Ok((input, DateTime::from_timestamp_nanos(unix_time)))
 }
 
+// TODO document properly
+// Price: 8 bytes, signed integer containing a fixed-point number with 4 digits to the right of an implied decimal
+// point
+pub fn price(input: &[u8]) -> IResult<&[u8], f64> {
+    let (input, int_price) = le_i64.parse(input)?;
+    Ok((input, (int_price as f64) * 1e-4))
+}
+
 /// Parses an IEX String (fixed-length ASCII byte sequence, left-justified and space-filled on the right)
 ///
 /// # Arguments

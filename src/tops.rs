@@ -10,7 +10,7 @@ use nom::{
     IResult, Parser as _,
 };
 
-use crate::utils;
+use crate::utils::{self, price};
 
 #[derive(Debug)]
 pub enum MarketSession {
@@ -31,14 +31,6 @@ where
     pub bid_price: f64,
     pub ask_size: u32,
     pub ask_price: f64,
-}
-
-// TODO document properly
-// Price: 8 bytes, signed integer containing a fixed-point number with 4 digits to the right of an implied decimal
-// point
-fn price(input: &[u8]) -> IResult<&[u8], f64> {
-    let (input, int_price) = le_i64.parse(input)?;
-    Ok((input, (int_price as f64) * 1e-4))
 }
 
 // Handle known yet unimplemented message types
