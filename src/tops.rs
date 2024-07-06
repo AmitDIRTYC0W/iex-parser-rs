@@ -33,35 +33,11 @@ where
     pub ask_price: f64,
 }
 
-// Handle known yet unimplemented message types
-macro_rules! dummy_message_parser {
-    ($tag:expr, $len:expr, $msg_type:ident) => {
-        fn $msg_type(input: &[u8]) -> IResult<&[u8], ()> {
-            let (input, _) = tag($tag).parse(input)?;
-            let (input, _) = take($len).parse(input)?;
-            Ok((input, ()))
-        }
-    };
-}
-
-dummy_message_parser!([0x53], 9usize, system_event);
-dummy_message_parser!([0x44], 30usize, security_directory);
-dummy_message_parser!([0x48], 21usize, trading_status);
-dummy_message_parser!([0x49], 17usize, retail_liquidity_indicator);
-dummy_message_parser!([0x4f], 17usize, operational_halt_status);
-dummy_message_parser!([0x50], 18usize, short_sale_price_test_status);
-dummy_message_parser!([0x54], 37usize, trade_report);
-dummy_message_parser!([0x58], 25usize, official_price);
-dummy_message_parser!([0x42], 37usize, trade_break);
-dummy_message_parser!([0x41], 79usize, auction_information);
-
 fn quote_update<S>(input: &[u8]) -> IResult<&[u8], QuoteUpdate<S>>
 where
     S: for<'a> From<&'a str>,
 {
     let (input, _) = tag([0x51]).parse(input)?;
-    // let (input, _) = bits::<_, _, Error<(&[u8], usize)>, _, _>(nom::bits::complete::take(4usize))
-    //     .parse(input)?;
     let (input, (availability, market_session, _)): (&[u8], (bool, bool, u8)) =
         bits::<_, _, Error<(&[u8], usize)>, _, _>(tuple((
             nom::bits::complete::bool,
@@ -94,6 +70,101 @@ where
 }
 
 #[derive(Debug)]
+pub struct SaleCondition {
+    pub intermarket_sweep: bool,
+    pub extended_hours: bool,
+    pub odd_lot: bool,
+    pub trade_through_exempt: bool,
+    pub single_price: bool,
+}
+
+fn sale_condition(input: &[u8]) -> IResult<&[u8], SaleCondition> {
+    let (
+        input,
+        (intermarket_sweep, extended_hours, odd_lot, trade_through_exempt, single_price, _),
+    ): (&[u8], (bool, bool, bool, bool, bool, u8)) =
+        bits::<_, _, Error<(&[u8], usize)>, _, _>(tuple((
+            nom::bits::complete::bool,
+            nom::bits::complete::bool,
+            nom::bits::complete::bool,
+            nom::bits::complete::bool,
+            nom::bits::complete::bool,
+            nom::bits::complete::tag(0u8, 3usize),
+        )))
+        .parse(input)?;
+
+    Ok((
+        input,
+        SaleCondition {
+            intermarket_sweep,
+            extended_hours,
+            odd_lot,
+            trade_through_exempt,
+            single_price,
+        },
+    ))
+}
+
+#[derive(Debug)]
+pub struct TradeReport<S>
+where
+    S: for<'a> From<&'a str>,
+{
+    pub sale_condition: SaleCondition,
+    pub timestamp: DateTime<Utc>,
+    pub symbol: S,
+    pub size: u32,
+    pub price: f64,
+    pub id: i64,
+}
+
+fn trade_report<S>(input: &[u8]) -> IResult<&[u8], TradeReport<S>>
+where
+    S: for<'a> From<&'a str>,
+{
+    let (input, _) = tag([0x54]).parse(input)?;
+    let (input, sale_condition) = sale_condition.parse(input)?;
+    let (input, timestamp) = utils::timestamp.parse(input)?;
+    let (input, symbol) = utils::iex_string(8).parse(input)?;
+    let (input, size) = le_u32.parse(input)?;
+    let (input, price) = price.parse(input)?;
+    let (input, id) = le_i64.parse(input)?;
+
+    Ok((
+        input,
+        TradeReport {
+            sale_condition,
+            timestamp,
+            symbol: symbol.into(),
+            size,
+            price,
+            id,
+        },
+    ))
+}
+
+// Handle known yet unimplemented message types
+macro_rules! dummy_message_parser {
+    ($tag:expr, $len:expr, $msg_type:ident) => {
+        fn $msg_type(input: &[u8]) -> IResult<&[u8], ()> {
+            let (input, _) = tag($tag).parse(input)?;
+            let (input, _) = take($len).parse(input)?;
+            Ok((input, ()))
+        }
+    };
+}
+
+dummy_message_parser!([0x53], 9usize, system_event);
+dummy_message_parser!([0x44], 30usize, security_directory);
+dummy_message_parser!([0x48], 21usize, trading_status);
+dummy_message_parser!([0x49], 17usize, retail_liquidity_indicator);
+dummy_message_parser!([0x4f], 17usize, operational_halt_status);
+dummy_message_parser!([0x50], 18usize, short_sale_price_test_status);
+dummy_message_parser!([0x58], 25usize, official_price);
+dummy_message_parser!([0x42], 37usize, trade_break);
+dummy_message_parser!([0x41], 79usize, auction_information);
+
+#[derive(Debug)]
 pub enum Tops1_6Message<S>
 where
     S: for<'a> From<&'a str>,
@@ -105,7 +176,7 @@ where
     OperationalHaltStatus,
     ShortSalePriceTestStatus,
     QuoteUpdate(QuoteUpdate<S>),
-    TradeReport,
+    TradeReport(TradeReport<S>),
     OfficialPrice,
     TradeBreak,
     AuctionInformation,
@@ -129,7 +200,7 @@ where
             Tops1_6Message::ShortSalePriceTestStatus
         }),
         map(quote_update::<S>, Tops1_6Message::QuoteUpdate),
-        map(trade_report, |_| Tops1_6Message::TradeReport),
+        map(trade_report::<S>, Tops1_6Message::TradeReport),
         map(official_price, |_| Tops1_6Message::OfficialPrice),
         map(trade_break, |_| Tops1_6Message::TradeBreak),
         map(auction_information, |_| Tops1_6Message::AuctionInformation),
@@ -187,13 +258,47 @@ mod tests {
     }
 
     #[test]
-    fn quote_with_set_flags() {
-        let input: [u8; 42] = [
-            81, 192, 130, 69, 230, 110, 149, 21, 218, 23, 65, 72, 73, 32, 32, 32, 32, 32, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    fn trade_report_example() {
+        let input: [u8; 38] = [
+            0x54, 0x00, 0xC3, 0xDF, 0xF7, 0x05, 0xA2, 0x86, 0x6D, 0x14, 0x5A, 0x49, 0x45, 0x58,
+            0x54, 0x20, 0x20, 0x20, 0x64, 0x00, 0x00, 0x00, 0x24, 0x1D, 0x0F, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x96, 0x8F, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
+        let result = tops_1_6_message::<String>(&input).unwrap();
 
-        let _ = tops_1_6_message::<String>(&input).unwrap();
+        assert_matches!(
+            result,
+            (
+                [],
+                Tops1_6Message::TradeReport(TradeReport {
+                    sale_condition: SaleCondition {
+                        intermarket_sweep: false,
+                        extended_hours: false,
+                        odd_lot: false,
+                        trade_through_exempt: false,
+                        single_price: false
+                    },
+                    timestamp: _,
+                    symbol: _,
+                    size: 100,
+                    price: _,
+                    id: 429_974,
+                })
+            )
+        );
+
+        if let Tops1_6Message::TradeReport(inner_result) = result.1 {
+            assert_eq!(
+                inner_result.timestamp,
+                DateTime::from_timestamp_nanos(1471980683662974915)
+            );
+
+            assert_eq!(inner_result.symbol, "ZIEXT");
+
+            assert_float_eq!(inner_result.price, 99.05, ulps <= 5);
+        } else {
+            unreachable!()
+        }
     }
 
     #[test]
