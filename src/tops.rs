@@ -3,7 +3,7 @@ use nom::{
     bits,
     branch::alt,
     bytes::complete::{tag, take},
-    combinator::map,
+    combinator::{map, value},
     error::Error,
     number::complete::{le_i64, le_u32},
     sequence::{tuple, Tuple as _},
@@ -11,6 +11,44 @@ use nom::{
 };
 
 use crate::utils::{self, price};
+
+#[derive(Clone, Debug)]
+pub enum SystemEventType {
+    StartOfMessages,
+    StartOfSystemHours,
+    StartOfRegularHours,
+    EndOfRegularHours,
+    EndOfSystemHours,
+    EndOfMessages,
+}
+
+#[derive(Debug)]
+pub struct SystemEvent {
+    pub event_type: SystemEventType,
+    pub timestamp: DateTime<Utc>,
+}
+
+fn system_event(input: &[u8]) -> IResult<&[u8], SystemEvent> {
+    let (input, _) = tag([0x53]).parse(input)?;
+    let (input, event_type) = alt((
+        value(SystemEventType::StartOfMessages, tag([0x4f])),
+        value(SystemEventType::StartOfSystemHours, tag([0x53])),
+        value(SystemEventType::StartOfRegularHours, tag([0x52])),
+        value(SystemEventType::EndOfRegularHours, tag([0x4d])),
+        value(SystemEventType::EndOfSystemHours, tag([0x45])),
+        value(SystemEventType::EndOfMessages, tag([0x43])),
+    ))
+    .parse(input)?;
+    let (input, timestamp) = utils::timestamp.parse(input)?;
+
+    Ok((
+        input,
+        SystemEvent {
+            event_type,
+            timestamp,
+        },
+    ))
+}
 
 #[derive(Debug)]
 pub enum MarketSession {
@@ -154,7 +192,6 @@ macro_rules! dummy_message_parser {
     };
 }
 
-dummy_message_parser!([0x53], 9usize, system_event);
 dummy_message_parser!([0x44], 30usize, security_directory);
 dummy_message_parser!([0x48], 21usize, trading_status);
 dummy_message_parser!([0x49], 17usize, retail_liquidity_indicator);
@@ -169,7 +206,7 @@ pub enum Tops1_6Message<S>
 where
     S: for<'a> From<&'a str>,
 {
-    SystemEvent,
+    SystemEvent(SystemEvent),
     SecurityDirectory,
     TradingStatus,
     RetailLiquidityIndicator,
@@ -187,7 +224,7 @@ where
     S: for<'a> From<&'a str>,
 {
     alt((
-        map(system_event, |_| Tops1_6Message::SystemEvent),
+        map(system_event, Tops1_6Message::SystemEvent),
         map(security_directory, |_| Tops1_6Message::SecurityDirectory),
         map(trading_status, |_| Tops1_6Message::TradingStatus),
         map(retail_liquidity_indicator, |_| {
@@ -303,8 +340,27 @@ mod tests {
 
     #[test]
     fn system_event_message() {
-        let input: [u8; 10] = [83, 79, 201, 234, 221, 110, 149, 21, 218, 23];
+        let input: [u8; 10] = [0x53, 0x45, 0x00, 0xA0, 0x99, 0x97, 0xE9, 0x3D, 0xB6, 0x14];
+        let result = tops_1_6_message::<String>(&input).unwrap();
 
-        let _ = tops_1_6_message::<String>(&input).unwrap();
+        assert_matches!(
+            result,
+            (
+                [],
+                Tops1_6Message::SystemEvent(SystemEvent {
+                    event_type: SystemEventType::EndOfSystemHours,
+                    timestamp: _,
+                })
+            )
+        );
+
+        if let Tops1_6Message::SystemEvent(inner_result) = result.1 {
+            assert_eq!(
+                inner_result.timestamp,
+                DateTime::from_timestamp_nanos(1492448400000000000)
+            );
+        } else {
+            unreachable!()
+        }
     }
 }
