@@ -22,7 +22,7 @@ pub enum SystemEventType {
     EndOfMessages,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SystemEvent {
     pub event_type: SystemEventType,
     pub timestamp: DateTime<Utc>,
@@ -50,13 +50,13 @@ fn system_event(input: &[u8]) -> IResult<&[u8], SystemEvent> {
     ))
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum MarketSession {
     Regular,
     OutOfHours,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct QuoteUpdate<S>
 where
     S: for<'a> From<&'a str>,
@@ -107,7 +107,7 @@ where
     ))
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SaleCondition {
     pub intermarket_sweep: bool,
     pub extended_hours: bool,
@@ -143,7 +143,7 @@ fn sale_condition(input: &[u8]) -> IResult<&[u8], SaleCondition> {
     ))
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TradeReport<S>
 where
     S: for<'a> From<&'a str>,
@@ -201,7 +201,7 @@ dummy_message_parser!([0x58], 25usize, official_price);
 dummy_message_parser!([0x42], 37usize, trade_break);
 dummy_message_parser!([0x41], 79usize, auction_information);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Tops1_6Message<S>
 where
     S: for<'a> From<&'a str>,

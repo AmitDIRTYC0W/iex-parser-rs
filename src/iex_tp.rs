@@ -54,7 +54,7 @@ fn iex_tp_1_segment(input: &[u8]) -> IResult<&[u8], IexTp1Segment> {
     ))
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum IexTpSegment<'a> {
     V1(IexTp1Segment<'a>),
 }
